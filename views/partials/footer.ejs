@@ -1,0 +1,44 @@
+    <footer>
+      <p>🚀 PS lab | Powered by <a href="https://api.nasa.gov/" target="_blank" rel="noopener">NASA APOD API</a></p>
+    </footer>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const loader = document.getElementById('loader-overlay');
+      
+      if (!loader) return; // Exit if loader doesn't exist on this page
+
+      function showLoader() {
+        loader.classList.add('visible');
+      }
+
+      // Show loader on form submit
+      const forms = document.querySelectorAll('form');
+      forms.forEach(form => {
+        form.addEventListener('submit', showLoader);
+      });
+
+      // Show loader on specific links
+      const links = document.querySelectorAll('a[href="/random"], a[href="/"], a.btn-secondary');
+      links.forEach(link => {
+        link.addEventListener('click', (e) => {
+          // Don't show if it's just a hash link or target blank
+          if (link.getAttribute('target') !== '_blank' && link.getAttribute('href') !== '#') {
+             showLoader();
+          }
+        });
+      });
+      
+      // Hide loader when page is fully loaded (handles browser back button)
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+          loader.classList.remove('visible');
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>

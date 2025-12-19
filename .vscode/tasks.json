@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "append_shooting_stars",
+			"type": "shell",
+			"command": "cat >>",
+			"args": [
+				"d:\\PS\\coding\\Przyszly_Programista\\Kurs HTML_CSS-Dr. Angela Yu\\Sekcja 29\\Capstone Project - Use a Public API\\public\\styles\\starfield.css",
+				"/* Shooting Stars Animation */\n.shooting-stars {\n    position: absolute;\n    top: 0;\n    left: 0;\n    width: 100%;\n    height: 100%;\n    transform: rotateZ(45deg);\n    z-index: 1;\n}\n\n.shooting-stars span {\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    width: 4px;\n    height: 4px;\n    background: #fff;\n    border-radius: 50%;\n    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1), \n                0 0 0 8px rgba(255, 255, 255, 0.1), \n                0 0 20px rgba(255, 255, 255, 1);\n    animation: animate-shooting 3s linear infinite;\n    opacity: 0;\n}\n\n.shooting-stars span::before {\n    content: '';\n    position: absolute;\n    top: 50%;\n    transform: translateY(-50%);\n    width: 300px;\n    height: 1px;\n    background: linear-gradient(90deg, #fff, transparent);\n}\n\n.shooting-stars span:nth-child(1) {\n    top: 0;\n    right: 0;\n    left: initial;\n    animation-delay: 0s;\n    animation-duration: 1s;\n}\n\n.shooting-stars span:nth-child(2) {\n    top: 0;\n    right: 80px;\n    left: initial;\n    animation-delay: 0.2s;\n    animation-duration: 3s;\n}\n\n.shooting-stars span:nth-child(3) {\n    top: 80px;\n    right: 0px;\n    left: initial;\n    animation-delay: 0.4s;\n    animation-duration: 2s;\n}\n\n@keyframes animate-shooting {\n    0% {\n        transform: rotate(315deg) translateX(0);\n        opacity: 1;\n    }\n    70% {\n        opacity: 1;\n    }\n    100% {\n        transform: rotate(315deg) translateX(-1000px);\n        opacity: 0;\n    }\n}\n"
+			],
+			"group": "none"
+		}
+	]
+}

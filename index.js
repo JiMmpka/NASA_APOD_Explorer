@@ -2,18 +2,23 @@ import express from "express";
 import axios from "axios";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
+import helmet from "helmet";
 
-// Load environment variables from .env file
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// NASA APOD API - Astronomy Picture of the Day
+// Security Middleware
+app.use(helmet.hidePoweredBy());
+app.use(helmet.xssFilter());
+app.use(helmet.noSniff());
+app.use(helmet.frameguard({ action: 'deny' }));
+
+// NASA APOD API
 const API_URL = "https://api.nasa.gov/planetary/apod";
 const API_KEY = process.env.NASA_API_KEY;
 
-// Validate API key exists
 if (!API_KEY) {
   console.error("❌ ERROR: NASA_API_KEY not found in environment variables!");
   console.error("🔑 Please create a .env file with your NASA API key");
@@ -21,196 +26,151 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// Rate limiting info
+// Rate limiting info (Source of Truth: NASA Headers)
 const RATE_LIMIT = {
-  hourly: 1000,    // 1000 requests per hour with personal API key
-  daily: 1000,     // No daily limit, but we'll track hourly resets
-  hourlyCount: 0,
-  dailyCount: 0,
-  hourlyResetTime: new Date(Date.now() + 60 * 60 * 1000),
-  dailyResetTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  limit: 1000,
+  remaining: 1000,
+  resetTime: null
 };
 
-// Function to check and update rate limits
-function updateRateLimit() {
-  const now = new Date();
-  
-  // Reset hourly counter
-  if (now >= RATE_LIMIT.hourlyResetTime) {
-    RATE_LIMIT.hourlyCount = 0;
-    RATE_LIMIT.hourlyResetTime = new Date(Date.now() + 60 * 60 * 1000);
+function updateRateLimitFromHeaders(headers) {
+  if (headers['x-ratelimit-limit']) {
+    RATE_LIMIT.limit = parseInt(headers['x-ratelimit-limit']);
   }
-  
-  // Reset daily counter
-  if (now >= RATE_LIMIT.dailyResetTime) {
-    RATE_LIMIT.dailyCount = 0;
-    RATE_LIMIT.dailyResetTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  if (headers['x-ratelimit-remaining']) {
+    RATE_LIMIT.remaining = parseInt(headers['x-ratelimit-remaining']);
   }
-  
-  // Increment counters
-  RATE_LIMIT.hourlyCount++;
-  RATE_LIMIT.dailyCount++;
 }
 
-// Function to get remaining requests
+// Simple In-Memory Cache
+const apodCache = new Map();
+
 function getRemainingRequests() {
   return {
-    hourly: Math.max(0, RATE_LIMIT.hourly - RATE_LIMIT.hourlyCount),
-    daily: Math.max(0, RATE_LIMIT.daily - RATE_LIMIT.dailyCount)
+    hourly: RATE_LIMIT.remaining
   };
 }
 
-// Middleware
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Set the view engine to EJS
 app.set("view engine", "ejs");
 
-// Route to render the home page - Today's APOD
+// Helper: Fetch APOD data
+async function fetchAPOD(date = null) {
+  const dateKey = date || new Date().toISOString().split('T')[0];
+
+  if (apodCache.has(dateKey)) {
+    console.log(`💾 Cache Hit for ${dateKey}`);
+    return apodCache.get(dateKey);
+  }
+
+  console.log(`📡 Fetching from NASA API... (Last known remaining: ${RATE_LIMIT.remaining})`);
+
+  const params = { api_key: API_KEY };
+  if (date) params.date = date;
+
+  const response = await axios.get(API_URL, { params, timeout: 25000 });
+  
+  updateRateLimitFromHeaders(response.headers);
+  console.log(`📊 Rate limit updated from headers - Remaining: ${RATE_LIMIT.remaining}/${RATE_LIMIT.limit}`);
+  
+  console.log(`✅ Successfully fetched APOD for ${dateKey}:`, response.data.title);
+  
+  apodCache.set(response.data.date, response.data);
+  if (!date && response.data.date !== dateKey) {
+     apodCache.set(dateKey, response.data);
+  }
+
+  return response.data;
+}
+
+// Helper: Standardized Error Handling
+function handleError(res, error, customMessage) {
+  console.error("❌ API Error:", error.message);
+  if (error.response) {
+    console.error("Error details:", error.response.data);
+    console.error("Status code:", error.response.status);
+  }
+
+  let errorMessage = customMessage;
+
+  if (error.response?.status === 429) {
+    errorMessage = "⚠️ API RATE LIMIT EXCEEDED! Get your FREE personal API key at https://api.nasa.gov/";
+  } else if (error.response?.status >= 500) {
+    errorMessage = "⚠️ NASA Servers are experiencing issues. Please try again later.";
+  } else if (error.code === 'ECONNABORTED') {
+    errorMessage = "⚠️ Connection timed out. NASA servers are slow to respond.";
+  } else {
+    errorMessage += ` ${error.message}`;
+  }
+
+  res.status(500).render("index.ejs", { 
+    data: null,
+    error: error.response?.data?.msg || errorMessage 
+  });
+}
+
 app.get("/", async (req, res) => {
   console.log("📡 GET / - Fetching today's APOD...");
-  
   try {
-    updateRateLimit();
-    console.log(`📊 Rate limit updated - Hourly: ${getRemainingRequests().hourly}/1000`);
-    
-    const response = await axios.get(API_URL, {
-      params: {
-        api_key: API_KEY
-      }
-    });
-    
-    console.log("✅ Successfully fetched today's APOD:", response.data.title);
-    
-    res.render("index.ejs", { 
-      data: response.data,
-      rateLimit: getRemainingRequests(),
-      error: null 
-    });
+    const data = await fetchAPOD();
+    res.render("index.ejs", { data, error: null });
   } catch (error) {
-    console.error("❌ API Error:", error.message);
-    console.error("Error details:", error.response?.data);
-    console.error("Status code:", error.response?.status);
-    
-    let errorMessage = "Failed to fetch today's picture.";
-    
-    if (error.response?.status === 429) {
-      errorMessage = "⚠️ API RATE LIMIT EXCEEDED! Get your FREE personal API key at https://api.nasa.gov/ " +
-                     "(email only, instant activation, 1000 requests/hour!). " +
-                     "Then add it to your .env file as NASA_API_KEY=your_key_here";
-    } else {
-      errorMessage += ` ${error.message}`;
-    }
-    
-    res.status(500).render("index.ejs", { 
-      data: null,
-      rateLimit: getRemainingRequests(),
-      error: errorMessage 
-    });
+    handleError(res, error, "Failed to fetch today's picture.");
   }
 });
 
-// Route to handle date selection
 app.post("/get-date-picture", async (req, res) => {
   const selectedDate = req.body.date;
   console.log(`📡 POST /get-date-picture - Fetching APOD for date: ${selectedDate}`);
   
+  // Security: Input Validation
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!selectedDate || !dateRegex.test(selectedDate)) {
+    return res.render("index.ejs", { data: null, error: "Invalid date format. Please use YYYY-MM-DD." });
+  }
+
+  // Security: Date Range Validation
+  const inputDate = new Date(selectedDate);
+  const minDate = new Date('1995-06-16');
+  const today = new Date();
+  
+  if (inputDate < minDate || inputDate > today) {
+    return res.render("index.ejs", { data: null, error: "Date must be between June 16, 1995 and today." });
+  }
+
   try {
-    updateRateLimit();
-    console.log(`📊 Rate limit updated - Hourly: ${getRemainingRequests().hourly}/1000`);
-    
-    const response = await axios.get(API_URL, {
-      params: {
-        api_key: API_KEY,
-        date: selectedDate
-      }
-    });
-    
-    console.log("✅ Successfully fetched data for date:", selectedDate, "-", response.data.title);
-    
-    res.render("index.ejs", { 
-      data: response.data,
-      rateLimit: getRemainingRequests(),
-      error: null 
-    });
+    const data = await fetchAPOD(selectedDate);
+    res.render("index.ejs", { data, error: null });
   } catch (error) {
-    console.error("❌ API Error:", error.message);
-    console.error("Error details:", error.response?.data);
-    console.error("Status code:", error.response?.status);
-    
-    let errorMessage = `Failed to fetch picture from ${selectedDate}.`;
-    
-    if (error.response?.status === 429) {
-      errorMessage = "⚠️ API RATE LIMIT EXCEEDED! Get your FREE personal API key at https://api.nasa.gov/ " +
-                     "(email only, instant activation, 1000 requests/hour!). " +
-                     "Then add it to your .env file as NASA_API_KEY=your_key_here";
-    } else {
-      errorMessage += ` ${error.message}`;
-    }
-    
-    res.status(500).render("index.ejs", { 
-      data: null,
-      rateLimit: getRemainingRequests(),
-      error: error.response?.data?.msg || errorMessage 
-    });
+    handleError(res, error, `Failed to fetch picture from ${selectedDate}.`);
   }
 });
 
-// Random picture from entire APOD archive (1995-06-16 to today)
 app.get("/random", async (req, res) => {
   console.log("📡 GET /random - Fetching random APOD...");
   
   try {
-    updateRateLimit();
-    // Get random date from entire NASA APOD archive
     const today = new Date();
-    const firstAPOD = new Date('1995-06-16'); // First APOD ever published
-    
-    // Calculate random date between first APOD and today
+    const firstAPOD = new Date('1995-06-16');
     const timeDiff = today.getTime() - firstAPOD.getTime();
     const randomTime = firstAPOD.getTime() + Math.floor(Math.random() * timeDiff);
     const randomDate = new Date(randomTime);
     const dateString = randomDate.toISOString().split('T')[0];
     
-    console.log(`🎲 Random date selected: ${dateString} (year: ${randomDate.getFullYear()})`);
-    console.log(`📊 Rate limit updated - Hourly: ${getRemainingRequests().hourly}/1000`);
-    
-    const response = await axios.get(API_URL, {
-      params: {
-        api_key: API_KEY,
-        date: dateString
-      }
-    });
-    
-    console.log("✅ Successfully fetched random data:", response.data.title);
-    
-    res.render("index.ejs", { 
-      data: response.data,
-      rateLimit: getRemainingRequests(),
-      error: null 
-    });
+    console.log(`🎲 Random date selected: ${dateString}`);
+
+    const data = await fetchAPOD(dateString);
+    res.render("index.ejs", { data, error: null });
   } catch (error) {
-    console.error("❌ API Error:", error.message);
-    console.error("Error details:", error.response?.data);
-    console.error("Status code:", error.response?.status);
-    
-    let errorMessage = "Failed to fetch random picture.";
-    
-    if (error.response?.status === 429) {
-      errorMessage = "⚠️ API RATE LIMIT EXCEEDED! Get your FREE personal API key at https://api.nasa.gov/ " +
-                     "(email only, instant activation, 1000 requests/hour!). " +
-                     "Then add it to your .env file as NASA_API_KEY=your_key_here";
-    } else {
-      errorMessage += ` ${error.message}`;
-    }
-    
-    res.status(500).render("index.ejs", { 
-      data: null,
-      rateLimit: getRemainingRequests(),
-      error: errorMessage
-    });
+    handleError(res, error, "Failed to fetch random picture.");
   }
+});
+
+app.get("/about", (req, res) => {
+  console.log("📄 GET /about - Rendering about page");
+  res.render("about.ejs", { pageTitle: "About - NASA APOD Explorer" });
 });
 
 app.listen(port, () => {

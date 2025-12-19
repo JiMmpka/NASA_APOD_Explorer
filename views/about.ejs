@@ -1,0 +1,55 @@
+<%- include('partials/header') %>
+
+<main>
+  <div class="about-container">
+    <h2>About This Project</h2>
+    
+    <section class="about-section">
+      <h3>🌌 What is NASA APOD?</h3>
+      <p>NASA's Astronomy Picture of the Day (APOD) is one of the most popular websites at NASA. Since its inception in June 1995, APOD has featured a different image or photograph of our fascinating universe every day, along with a brief explanation written by a professional astronomer.</p>
+    </section>
+
+    <section class="about-section">
+      <h3>🔭 How to Use This App</h3>
+      <ul>
+        <li><strong>Today's Picture:</strong> View today's featured astronomy image automatically on the homepage</li>
+        <li><strong>Select Date:</strong> Browse the archive from June 16, 1995 to today using the date picker</li>
+        <li><strong>Random Picture:</strong> Discover a random cosmic image from the entire archive</li>
+        <li><strong>HD Images:</strong> Click on any image to view it in full high-definition resolution</li>
+      </ul>
+    </section>
+
+    <section class="about-section">
+      <h3>📅 Archive Information</h3>
+      <p><strong>Available dates:</strong> From June 16, 1995 to the present day</p>
+      <p>The archive contains thousands of stunning astronomical images including galaxies, nebulae, planets, stars, and more. Some entries feature videos instead of images.</p>
+    </section>
+
+    <section class="about-section">
+      <h3>🔑 API Information</h3>
+      <p>This application uses the official <strong>NASA APOD API</strong> to fetch astronomical data in real-time.</p>
+      <ul>
+        <li><strong>API Endpoint:</strong> <code>https://api.nasa.gov/planetary/apod</code></li>
+        <li><strong>Authentication:</strong> Requires a free NASA API key</li>
+        <li><strong>Rate Limits:</strong> 1,000 requests per hour with personal API key</li>
+        <li><strong>Get your own key:</strong> Visit <a href="https://api.nasa.gov/" target="_blank" rel="noopener">api.nasa.gov</a> (free, instant activation)</li>
+      </ul>
+    </section>
+
+    <section class="about-section">
+      <h3>🛠️ Technologies Used</h3>
+      <ul>
+        <li><strong>Backend:</strong> Node.js, Express.js</li>
+        <li><strong>Templating:</strong> EJS</li>
+        <li><strong>HTTP Client:</strong> Axios</li>
+        <li><strong>Styling:</strong> Custom CSS with space theme</li>
+      </ul>
+    </section>
+
+    <div class="back-link">
+      <a href="/" class="btn-primary"><span>← Back to Home</span></a>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

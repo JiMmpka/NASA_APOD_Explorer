@@ -1,19 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🌌 NASA APOD - Astronomy Picture of the Day</title>
-  <link rel="stylesheet" href="/styles/main.css">
-</head>
-
-<body>
-  <div class="container">
-    <header>
-      <h1>🌌 NASA APOD Explorer</h1>
-      <p class="subtitle">Astronomy Picture of the Day - Daily cosmic images from NASA</p>
-    </header>
+<%- include('partials/header') %>
 
     <main>
       <!-- Date Selection Section -->
@@ -27,112 +12,69 @@
                  min="1995-06-16"
                  value="<%= data ? data.date : new Date().toISOString().split('T')[0] %>"
                  required>
-          <button type="submit" class="btn-primary">🔭 Show Picture</button>
+          <button type="submit" class="btn-primary"><span>🔭 Show Picture</span></button>
         </form>
-        <a href="/random" class="btn-secondary">🎲 Random Picture</a>
-        <a href="/" class="btn-secondary">📆 Today's Picture</a>
+        <a href="/random" class="btn-secondary"><span>🎲 Random Picture</span></a>
+        <a href="/" class="btn-secondary"><span>📆 Today's Picture</span></a>
       </div>
 
-      <!-- NASA APOD Data Display Section -->
-      <% if (data) { %>
-      <div class="space-data-section">
-        <div class="apod-header">
-          <h2><%= data.title %></h2>
-          <p class="apod-date">📅 Date: <%= data.date %></p>
-          <% if (data.copyright) { %>
-            <p class="apod-copyright">📸 © <%= data.copyright %></p>
-          <% } %>
+      <!-- Content Display Wrapper (for loading animation) -->
+      <div class="content-display-wrapper">
+        <!-- Loading Overlay -->
+        <div id="loader-overlay" class="loader-overlay">
+          <div class="loader-content">
+            <div class="spinner"></div>
+            <p>🚀 Traveling through space to NASA servers...</p>
+          </div>
         </div>
-        
-        <div class="space-image-container">
-          <% if (data.media_type === 'image') { %>
-            <a href="<%= data.hdurl || data.url %>" target="_blank">
-              <img src="<%= data.url %>" 
-                   alt="<%= data.title %>" 
-                   class="space-image">
-            </a>
-            <p class="image-hint">💡 Click on the image to view in full resolution</p>
-          <% } else if (data.media_type === 'video') { %>
-            <div class="video-container">
-              <iframe src="<%= data.url %>" 
-                      frameborder="0" 
-                      allowfullscreen
-                      class="space-video"></iframe>
-            </div>
-          <% } %>
-        </div>
-        
-        <div class="space-fact-container">
-          <h3>📖 Description:</h3>
-          <p class="space-explanation"><%= data.explanation %></p>
-        </div>
-      </div>
-      <% } %>
 
-      <!-- Error Section -->
-      <% if (error) { %>
-      <div class="error-section">
-        <h3>❌ Oops! Something went wrong</h3>
-        <p><%= error %></p>
-        <a href="/" class="btn-secondary">🔄 Try Again</a>
-      </div>
-      <% } %>
-
-      <!-- Additional Information -->
-      <div class="info-section">
-        <h3>ℹ️ About This Project</h3>
-        <p>This application uses the official <strong>NASA APOD API</strong> (Astronomy Picture of the Day) to display daily astronomical images along with scientific descriptions. Every day, NASA publishes a new image or video from space!</p>
-        <p><strong>Available dates:</strong> From June 16, 1995 to today</p>
-      </div>
-
-      <!-- API Rate Limits Section -->
-      <div class="rate-limit-section">
-        <h3>📊 API Rate Limits</h3>
-        <div class="rate-limit-info">
-          <div class="limit-card">
-            <div class="limit-icon">⏰</div>
-            <div class="limit-content">
-              <h4>Hourly Limit</h4>
-              <p class="limit-number">
-                <span class="remaining <%= rateLimit.hourly <= 100 ? 'warning' : '' %>">
-                  <%= rateLimit.hourly %>
-                </span> / 1000
-              </p>
-              <p class="limit-text">requests remaining</p>
-            </div>
+        <!-- NASA APOD Data Display Section -->
+        <% if (data) { %>
+        <div class="space-data-section">
+          <div class="apod-header">
+            <h2><%= data.title %></h2>
+            <p class="apod-date">📅 Date: <%= data.date %></p>
+            <% if (data.copyright) { %>
+              <p class="apod-copyright">📸 © <%= data.copyright %></p>
+            <% } %>
           </div>
           
-          <div class="limit-card">
-            <div class="limit-icon">📅</div>
-            <div class="limit-content">
-              <h4>Status</h4>
-              <p class="limit-number">
-                <span class="remaining">
-                  ✓
-                </span>
-              </p>
-              <p class="limit-text">Personal API Key Active</p>
+          <div class="space-image-container">
+            <% if (data.media_type === 'image') { %>
+              <a href="<%= data.hdurl || data.url %>" target="_blank">
+                <img src="<%= data.url %>" 
+                     alt="<%= data.title %>" 
+                     class="space-image">
+              </a>
+              <p class="image-hint">💡 Click on the image to view in full resolution</p>
+            <% } else if (data.media_type === 'video') { %>
+              <div class="video-container">
+                <iframe src="<%= data.url %>" 
+                        frameborder="0" 
+                        allowfullscreen
+                        class="space-video"></iframe>
+              </div>
+            <% } %>
+          </div>
+          
+          <div class="space-fact-container">
+            <h3>📖 Description:</h3>
+            <div class="space-fact-scrollable">
+              <p class="space-explanation"><%= data.explanation %></p>
             </div>
           </div>
         </div>
-        
-        <div class="api-key-info">
-          <p>💡 <strong>Note:</strong> This app uses a personal NASA API key with generous limits:</p>
-          <ul>
-            <li>1,000 requests per hour</li>
-            <li>No daily limit</li>
-          </ul>
-          <p>🔑 Get your own <strong>free API key</strong> at 
-            <a href="https://api.nasa.gov/" target="_blank" rel="noopener">https://api.nasa.gov/</a> 
-            (instant activation, only email required)!</p>
+        <% } %>
+
+        <!-- Error Section -->
+        <% if (error) { %>
+        <div class="error-section">
+          <h3>❌ Oops! Something went wrong</h3>
+          <p><%= error %></p>
+          <a href="/" class="btn-secondary"><span>🔄 Try Again</span></a>
         </div>
+        <% } %>
       </div>
     </main>
 
-    <footer>
-      <p>🚀 Capstone Project - Dr. Angela Yu's Course | Powered by NASA APOD API</p>
-    </footer>
-  </div>
-</body>
-
-</html>
+<%- include('partials/footer') %>
