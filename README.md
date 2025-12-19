@@ -4,7 +4,7 @@ A web application that displays NASA's Astronomy Picture of the Day (APOD). Expl
 
 ## 🌐 Live Demo
 
-**[View Live Demo →](https://nasa-apod-explorer-3oku.onrender.com/random)**
+**[View Live Demo →](https://nasa-apod-explorer-3oku.onrender.com)**
 
 > Note: The app may take 30 seconds to wake up on first load (free tier hosting).
 
