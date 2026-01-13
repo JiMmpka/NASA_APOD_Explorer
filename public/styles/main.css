@@ -1055,3 +1055,8 @@ footer a:hover {
   50% { opacity: 1; }
   100% { opacity: 0.6; }
 }
+
+/* Visibility Helpers */
+.hidden-initially {
+  display: none !important;
+}

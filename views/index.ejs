@@ -30,7 +30,7 @@
         </div>
 
         <!-- NASA APOD Data Display Section -->
-        <div id="apod-container" class="space-data-section" style="display: none;">
+        <div id="apod-container" class="space-data-section hidden-initially">
           <div class="apod-header">
             <h2 id="apod-title"></h2>
             <p class="apod-date">📅 Date: <span id="display-date"></span></p>
@@ -50,7 +50,7 @@
         </div>
 
         <!-- Error Section -->
-        <div id="error-container" class="error-section" style="<%= error ? 'display: block;' : 'display: none;' %>">
+        <div id="error-container" class="error-section <%= error ? '' : 'hidden-initially' %>">
           <h3>❌ Oops! Something went wrong</h3>
           <p id="error-message"><%= error %></p>
           <a href="/" class="btn-secondary"><span>🔄 Try Again</span></a>
@@ -65,17 +65,17 @@
         const errorContainer = document.getElementById('error-container');
         const errorMessage = document.getElementById('error-message');
         const initialDate = "<%= typeof initialDate !== 'undefined' ? initialDate : '' %>";
-        const hasServerError = <%= error ? 'true' : 'false' %>;
+        const hasServerError = "<%= error ? 'true' : 'false' %>";
 
         // Jeśli serwer już wyrenderował błąd (walidacja), nie rób nic
-        if (hasServerError) {
+        if (hasServerError === "true") {
           loader.classList.remove('visible');
           return;
         }
         
         loader.classList.add('visible');
-        apodContainer.style.display = 'none';
-        errorContainer.style.display = 'none';
+        apodContainer.classList.add('hidden-initially');
+        errorContainer.classList.add('hidden-initially');
 
         const url = initialDate ? `/api/date/${initialDate}` : '/api/today';
 
@@ -119,12 +119,12 @@
 
           // Show content
           loader.classList.remove('visible');
-          apodContainer.style.display = ''; // Removing inline display: none to allow CSS Grid to work
+          apodContainer.classList.remove('hidden-initially');
 
         } catch (err) {
           loader.classList.remove('visible');
           document.getElementById('error-message').textContent = err.message;
-          errorContainer.style.display = 'block';
+          errorContainer.classList.remove('hidden-initially');
         }
       }
 
