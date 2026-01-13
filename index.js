@@ -70,29 +70,33 @@ async function fetchAPOD(date = null) {
   const params = { api_key: API_KEY };
   if (date) params.date = date;
 
-  const response = await axios.get(API_URL, { params, timeout: 25000 });
-  
-  updateRateLimitFromHeaders(response.headers);
-  console.log(`📊 Rate limit updated from headers - Remaining: ${RATE_LIMIT.remaining}/${RATE_LIMIT.limit}`);
-  
-  console.log(`✅ Successfully fetched APOD for ${dateKey}:`, response.data.title);
-  
-  apodCache.set(response.data.date, response.data);
-  if (!date && response.data.date !== dateKey) {
-     apodCache.set(dateKey, response.data);
-  }
+  try {
+    const response = await axios.get(API_URL, { 
+      params, 
+      timeout: 30000, 
+      family: 4 // Wymuszenie IPv4 (często rozwiązuje problemy z timeoutami na Windowsie)
+    });
+    
+    updateRateLimitFromHeaders(response.headers);
+    console.log(`📊 Rate limit updated from headers - Remaining: ${RATE_LIMIT.remaining}/${RATE_LIMIT.limit}`);
+    
+    console.log(`✅ Successfully fetched APOD for ${dateKey}:`, response.data.title);
+    
+    apodCache.set(response.data.date, response.data);
+    
+    if (!date && response.data.date !== dateKey) {
+       apodCache.set(dateKey, response.data);
+    }
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    // Rzucamy błąd dalej do handlera w routingu
+    throw error;
+  }
 }
 
 // Helper: Standardized Error Handling
-function handleError(res, error, customMessage) {
-  console.error("❌ API Error:", error.message);
-  if (error.response) {
-    console.error("Error details:", error.response.data);
-    console.error("Status code:", error.response.status);
-  }
-
+function getErrorMessage(error, customMessage) {
   let errorMessage = customMessage;
 
   if (error.response?.status === 429) {
@@ -104,68 +108,73 @@ function handleError(res, error, customMessage) {
   } else {
     errorMessage += ` ${error.message}`;
   }
-
-  res.status(500).render("index.ejs", { 
-    data: null,
-    error: error.response?.data?.msg || errorMessage 
-  });
+  return errorMessage;
 }
 
-app.get("/", async (req, res) => {
-  console.log("📡 GET / - Fetching today's APOD...");
+function logError(error) {
+  console.error("❌ API Error:", error.message);
+  if (error.response) {
+    console.error("Error Status:", error.response.status);
+    console.error("Error Data:", JSON.stringify(error.response.data, null, 2));
+  } else if (error.request) {
+    console.error("❌ No response received from NASA API.");
+  }
+}
+
+app.get("/", (req, res) => {
+  res.render("index.ejs", { data: null, error: null, isLoading: true });
+});
+
+app.get("/api/today", async (req, res) => {
   try {
     const data = await fetchAPOD();
-    res.render("index.ejs", { data, error: null });
+    res.json(data);
   } catch (error) {
-    handleError(res, error, "Failed to fetch today's picture.");
+    logError(error);
+    res.status(500).json({ error: getErrorMessage(error, "Failed to fetch today's picture.") });
   }
 });
 
-app.post("/get-date-picture", async (req, res) => {
+app.post("/get-date-picture", (req, res) => {
   const selectedDate = req.body.date;
-  console.log(`📡 POST /get-date-picture - Fetching APOD for date: ${selectedDate}`);
   
-  // Security: Input Validation
+  // Walidacja daty (przywrócona)
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!selectedDate || !dateRegex.test(selectedDate)) {
-    return res.render("index.ejs", { data: null, error: "Invalid date format. Please use YYYY-MM-DD." });
+    return res.render("index.ejs", { data: null, error: "Invalid date format. Please use YYYY-MM-DD.", isLoading: false });
   }
 
-  // Security: Date Range Validation
   const inputDate = new Date(selectedDate);
   const minDate = new Date('1995-06-16');
   const today = new Date();
   
   if (inputDate < minDate || inputDate > today) {
-    return res.render("index.ejs", { data: null, error: "Date must be between June 16, 1995 and today." });
+    return res.render("index.ejs", { data: null, error: "Date must be between June 16, 1995 and today.", isLoading: false });
   }
 
+  res.render("index.ejs", { data: null, error: null, isLoading: true, initialDate: selectedDate });
+});
+
+app.get("/api/date/:date", async (req, res) => {
   try {
-    const data = await fetchAPOD(selectedDate);
-    res.render("index.ejs", { data, error: null });
+    const data = await fetchAPOD(req.params.date);
+    res.json(data);
   } catch (error) {
-    handleError(res, error, `Failed to fetch picture from ${selectedDate}.`);
+    logError(error);
+    res.status(500).json({ error: getErrorMessage(error, `Failed to fetch picture from ${req.params.date}.`) });
   }
 });
 
-app.get("/random", async (req, res) => {
-  console.log("📡 GET /random - Fetching random APOD...");
+app.get("/random", (req, res) => {
+  // Przerabiamy również random na async po stronie klienta dla spójności
+  const today = new Date();
+  const firstAPOD = new Date('1995-06-16');
+  const timeDiff = today.getTime() - firstAPOD.getTime();
+  const randomTime = firstAPOD.getTime() + Math.floor(Math.random() * timeDiff);
+  const randomDate = new Date(randomTime);
+  const dateString = randomDate.toISOString().split('T')[0];
   
-  try {
-    const today = new Date();
-    const firstAPOD = new Date('1995-06-16');
-    const timeDiff = today.getTime() - firstAPOD.getTime();
-    const randomTime = firstAPOD.getTime() + Math.floor(Math.random() * timeDiff);
-    const randomDate = new Date(randomTime);
-    const dateString = randomDate.toISOString().split('T')[0];
-    
-    console.log(`🎲 Random date selected: ${dateString}`);
-
-    const data = await fetchAPOD(dateString);
-    res.render("index.ejs", { data, error: null });
-  } catch (error) {
-    handleError(res, error, "Failed to fetch random picture.");
-  }
+  res.render("index.ejs", { data: null, error: null, isLoading: true, initialDate: dateString });
 });
 
 app.get("/about", (req, res) => {

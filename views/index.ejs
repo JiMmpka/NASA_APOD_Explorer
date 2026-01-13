@@ -8,6 +8,7 @@
           <input type="date" 
                  name="date" 
                  id="dateInput" 
+               lang="pl-PL"
                  max="<%= new Date().toISOString().split('T')[0] %>"
                  min="1995-06-16"
                  value="<%= data ? data.date : new Date().toISOString().split('T')[0] %>"
@@ -29,52 +30,104 @@
         </div>
 
         <!-- NASA APOD Data Display Section -->
-        <% if (data) { %>
-        <div class="space-data-section">
+        <div id="apod-container" class="space-data-section" style="display: none;">
           <div class="apod-header">
-            <h2><%= data.title %></h2>
-            <p class="apod-date">📅 Date: <%= data.date %></p>
-            <% if (data.copyright) { %>
-              <p class="apod-copyright">📸 © <%= data.copyright %></p>
-            <% } %>
+            <h2 id="apod-title"></h2>
+            <p class="apod-date">📅 Date: <span id="display-date"></span></p>
+            <p id="apod-copyright" class="apod-copyright"></p>
           </div>
           
-          <div class="space-image-container">
-            <% if (data.media_type === 'image') { %>
-              <a href="<%= data.hdurl || data.url %>" target="_blank">
-                <img src="<%= data.url %>" 
-                     alt="<%= data.title %>" 
-                     class="space-image">
-              </a>
-              <p class="image-hint">💡 Click on the image to view in full resolution</p>
-            <% } else if (data.media_type === 'video') { %>
-              <div class="video-container">
-                <iframe src="<%= data.url %>" 
-                        frameborder="0" 
-                        allowfullscreen
-                        class="space-video"></iframe>
-              </div>
-            <% } %>
+          <div id="media-container" class="space-image-container">
+            <!-- Will be filled by JS -->
           </div>
           
           <div class="space-fact-container">
             <h3>📖 Description:</h3>
             <div class="space-fact-scrollable">
-              <p class="space-explanation"><%= data.explanation %></p>
+              <p id="apod-explanation" class="space-explanation"></p>
             </div>
           </div>
         </div>
-        <% } %>
 
         <!-- Error Section -->
-        <% if (error) { %>
-        <div class="error-section">
+        <div id="error-container" class="error-section" style="<%= error ? 'display: block;' : 'display: none;' %>">
           <h3>❌ Oops! Something went wrong</h3>
-          <p><%= error %></p>
+          <p id="error-message"><%= error %></p>
           <a href="/" class="btn-secondary"><span>🔄 Try Again</span></a>
         </div>
-        <% } %>
       </div>
     </main>
 
+    <script>
+      async function loadData() {
+        const loader = document.getElementById('loader-overlay');
+        const apodContainer = document.getElementById('apod-container');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const initialDate = "<%= typeof initialDate !== 'undefined' ? initialDate : '' %>";
+        const hasServerError = <%= error ? 'true' : 'false' %>;
+
+        // Jeśli serwer już wyrenderował błąd (walidacja), nie rób nic
+        if (hasServerError) {
+          loader.classList.remove('visible');
+          return;
+        }
+        
+        loader.classList.add('visible');
+        apodContainer.style.display = 'none';
+        errorContainer.style.display = 'none';
+
+        const url = initialDate ? `/api/date/${initialDate}` : '/api/today';
+
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+
+          if (!response.ok) throw new Error(data.error || 'Failed to fetch');
+
+          // Title & Date
+          document.getElementById('apod-title').textContent = data.title;
+          document.getElementById('display-date').textContent = data.date;
+          
+          // Copyright
+          const copyright = document.getElementById('apod-copyright');
+          if (data.copyright) {
+            copyright.textContent = `📸 © ${data.copyright}`;
+            copyright.style.display = 'block';
+          } else {
+            copyright.style.display = 'none';
+          }
+
+          // Media
+          const mediaContainer = document.getElementById('media-container');
+          mediaContainer.innerHTML = '';
+          if (data.media_type === 'image') {
+            mediaContainer.innerHTML = `
+              <a href="${data.hdurl || data.url}" target="_blank">
+                <img src="${data.url}" alt="${data.title}" class="space-image">
+              </a>
+              <p class="image-hint">💡 Click on the image to view in full resolution</p>`;
+          } else if (data.media_type === 'video') {
+            mediaContainer.innerHTML = `
+              <div class="video-container">
+                <iframe src="${data.url}" frameborder="0" allowfullscreen class="space-video"></iframe>
+              </div>`;
+          }
+
+          // Explanation
+          document.getElementById('apod-explanation').textContent = data.explanation;
+
+          // Show content
+          loader.classList.remove('visible');
+          apodContainer.style.display = 'block';
+
+        } catch (err) {
+          loader.classList.remove('visible');
+          document.getElementById('error-message').textContent = err.message;
+          errorContainer.style.display = 'block';
+        }
+      }
+
+      window.addEventListener('load', loadData);
+    </script>
 <%- include('partials/footer') %>
