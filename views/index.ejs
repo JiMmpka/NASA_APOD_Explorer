@@ -119,7 +119,7 @@
 
           // Show content
           loader.classList.remove('visible');
-          apodContainer.style.display = 'block';
+          apodContainer.style.display = ''; // Removing inline display: none to allow CSS Grid to work
 
         } catch (err) {
           loader.classList.remove('visible');
